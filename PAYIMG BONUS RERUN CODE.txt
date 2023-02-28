@@ -1,0 +1,199 @@
+BEGIN
+    drop_table('al_wd_paysr_bonus_analysis');
+    COMMIT;
+END;
+/
+
+CREATE TABLE hrp_al_wd_paysr_bonus_analysis AS
+WITH wd_bonuses AS (
+    SELECT employee_id,
+           job_code,
+           bonus_code,
+           pay_level
+    FROM hrp_tenant_additional_allowances
+    WHERE additional_allowances_plans IS NOT NULL
+),
+     hrc AS (
+         SELECT emps.employee_id,
+                emps.department_nbr,
+                emps.department_title,
+                bonus.bonus_code,
+                bonus.pay_level,
+                bonus.amount,
+                emps.legacy_status,
+                emps.job_class || '-' || emps.pay_grade || '-' || emps.company AS job_profile
+         FROM paysr.hr_c_jobs emps
+                  INNER JOIN paysr.hr_c_additional_pay bonus
+                             ON emps.job_number = bonus.job_number
+                                 AND emps.employee_id = bonus.employee_id
+                                 AND emps.prime_job = 'X'
+         WHERE emps.legacy_status < '50'
+           AND emps.legacy_status NOT IN ('08', '09')
+           AND emps.job_status = 'Active'
+           AND emps.company <> 'DWP'
+     )
+SELECT hrc.employee_id        AS paysr_eid,
+       wd_bonuses.employee_id AS wd_eid,
+       hrc.job_profile,
+       hrc.department_nbr,
+       hrc.department_title,
+       hrc.legacy_status,
+       hrc.bonus_code         AS paysr_bonus_code,
+       hrc.pay_level          AS paysr_pay_level,
+       wd_bonuses.bonus_code  AS wd_bonus_code,
+       wd_bonuses.pay_level   AS wd_pay_level
+FROM hrc
+         FULL OUTER JOIN wd_bonuses
+                         ON wd_bonuses.employee_id = hrc.employee_id
+                             AND wd_bonuses.bonus_code = hrc.bonus_code
+                             AND wd_bonuses.pay_level = hrc.pay_level
+WHERE (hrc.bonus_code IS NULL
+    OR wd_bonuses.bonus_code IS NULL)
+ORDER BY 2, 1;
+
+BEGIN
+    UPDATE hrp_al_wd_paysr_bonus_analysis t
+    SET (job_profile, department_nbr, department_title, legacy_status) = (
+        SELECT job_class || '-' || pay_grade || '-' || company, department_nbr, department_title, legacy_status
+        FROM paysr.hr_c_jobs s
+        WHERE t.wd_eid = s.employee_id
+          AND s.prime_job = 'X'
+    )
+    WHERE t.job_profile IS NULL;
+    COMMIT;
+
+    DELETE
+    FROM hrp_al_wd_paysr_bonus_analysis
+    WHERE job_profile NOT LIKE '%-LAC';
+    COMMIT;
+END;
+/
+
+
+To select only Bonus_code from hrp_tenant_additional_allowances from PAYIMG
+SELECT employee_id,
+       job_code,
+       REGEXP_SUBSTR(ADDITIONAL_ALLOWANCE_PLANS, '-\s*(\w+\s*\w*)', 1, 1, '', 1) AS Bonus_code
+FROM hrp_tenant_additional_allowances;
+
+
+
+-- Turn on spooling and set the output file name and directory
+SPOOL C:\output\hrpal_wd_paysr_bonus_analysis.txt
+
+-- Create the hrp_al_wd_paysr_bonus_analysis table
+CREATE TABLE hrp_al_wd_paysr_bonus_analysis AS
+WITH wd_bonuses AS (
+    SELECT employee_id,
+           job_code,
+           bonus_code,
+           pay_level
+    FROM al_hrp_tenant_additional_allowances
+    WHERE additional_allowances_plans IS NOT NULL
+),
+     hrc AS (
+         SELECT emps.employee_id,
+                emps.department_nbr,
+                emps.department_title,
+                bonus.bonus_code,
+                bonus.pay_level,
+                bonus.amount,
+                emps.legacy_status,
+                emps.job_class || '-' || emps.pay_grade || '-' || emps.company AS job_profile
+         FROM paysr.hr_c_jobs emps
+                  INNER JOIN paysr.hr_c_additional_pay bonus
+                             ON emps.job_number = bonus.job_number
+                                 AND emps.employee_id = bonus.employee_id
+                                 AND emps.prime_job = 'X'
+         WHERE emps.legacy_status < '50'
+           AND emps.legacy_status NOT IN ('08', '09')
+           AND emps.job_status = 'Active'
+           AND emps.company <> 'DWP'
+     )
+SELECT hrc.employee_id        AS paysr_eid,
+       wd_bonuses.employee_id AS wd_eid,
+       hrc.job_profile,
+       hrc.department_nbr,
+       hrc.department_title,
+       hrc.legacy_status,
+       hrc.bonus_code         AS paysr_bonus_code,
+       hrc.pay_level          AS paysr_pay_level,
+       wd_bonuses.bonus_code  AS wd_bonus_code,
+       wd_bonuses.pay_level   AS wd_pay_level
+FROM hrc
+         FULL OUTER JOIN wd_bonuses
+                         ON wd_bonuses.employee_id = hrc.employee_id
+                             AND wd_bonuses.bonus_code = hrc.bonus_code
+                             AND wd_bonuses.pay_level = hrc.pay_level
+WHERE (hrc.bonus_code IS NULL
+    OR wd_bonuses.bonus_code IS NULL)
+ORDER BY 2, 1;
+
+-- Update the hrp_al_wd_paysr_bonus_analysis table
+BEGIN
+    UPDATE hrp_al_wd_paysr_bonus_analysis t
+    SET (job_profile, department_nbr, department_title, legacy_status) = (
+        SELECT job_class || '-' || pay_grade || '-' || company, department_nbr, department_title, legacy_status
+        FROM paysr.hr_c_jobs s
+        WHERE t.wd_eid = s.employee_id
+          AND s.prime_job = 'X'
+    )
+    WHERE t.job_profile IS NULL;
+    COMMIT;
+
+    DELETE
+    FROM hrp_al_wd_paysr_bonus_analysis
+    WHERE job_profile NOT LIKE '%-LAC';
+    COMMIT;
+END;
+/
+
+-- Turn off spooling
+SPOOL OFF;
+
+CREATE VIEW hrp_al_wd_paysr_bonus_view AS
+WITH wd_bonuses AS (
+    SELECT employee_id,
+           job_code,
+           bonus_code,
+           pay_level
+    FROM hrp_tenant_additional_allowances
+    WHERE additional_allowances_plans IS NOT NULL
+),
+     hrc AS (
+         SELECT emps.employee_id,
+                emps.department_nbr,
+                emps.department_title,
+                bonus.bonus_code,
+                bonus.pay_level,
+                bonus.amount,
+                emps.legacy_status,
+                emps.job_class || '-' || emps.pay_grade || '-' || emps.company AS job_profile
+         FROM paysr.hr_c_jobs emps
+                  INNER JOIN paysr.hr_c_additional_pay bonus
+                             ON emps.job_number = bonus.job_number
+                                 AND emps.employee_id = bonus.employee_id
+                                 AND emps.prime_job = 'X'
+         WHERE emps.legacy_status < '50'
+           AND emps.legacy_status NOT IN ('08', '09')
+           AND emps.job_status = 'Active'
+           AND emps.company <> 'DWP'
+     )
+SELECT hrc.employee_id        AS paysr_eid,
+       wd_bonuses.employee_id AS wd_eid,
+       hrc.job_profile,
+       hrc.department_nbr,
+       hrc.department_title,
+       hrc.legacy_status,
+       hrc.bonus_code         AS paysr_bonus_code,
+       hrc.pay_level          AS paysr_pay_level,
+       wd_bonuses.bonus_code  AS wd_bonus_code,
+       wd_bonuses.pay_level   AS wd_pay_level
+FROM hrc
+         FULL OUTER JOIN wd_bonuses
+                         ON wd_bonuses.employee_id = hrc.employee_id
+                             AND wd_bonuses.bonus_code = hrc.bonus_code
+                             AND wd_bonuses.pay_level = hrc.pay_level
+WHERE (hrc.bonus_code IS NULL
+    OR wd_bonuses.bonus_code IS NULL)
+ORDER BY 2, 1;
